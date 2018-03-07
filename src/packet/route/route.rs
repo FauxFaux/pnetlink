@@ -1,6 +1,6 @@
 //! Route operations
-use packet::route::{RouteCacheInfoPacket, RtMsgPacket, MutableIfInfoPacket, IfInfoPacket,
-                    RtAttrIterator, RtAttrPacket, MutableRtAttrPacket};
+use packet::route::{IfInfoPacket, MutableIfInfoPacket, MutableRtAttrPacket, RouteCacheInfoPacket,
+                    RtAttrIterator, RtAttrPacket, RtMsgPacket};
 use packet::netlink::NetlinkPacket;
 use packet::netlink::NetlinkMsgFlags;
 use packet::netlink::{NetlinkBufIterator, NetlinkReader, NetlinkRequestBuilder};
@@ -10,9 +10,9 @@ use pnet::packet::Packet;
 use pnet::packet::PacketSize;
 use util;
 
-use std::net::{Ipv4Addr, IpAddr};
-use std::io::{Read, Cursor};
-use byteorder::{LittleEndian, BigEndian, ReadBytesExt, NativeEndian, ByteOrder};
+use std::net::{IpAddr, Ipv4Addr};
+use std::io::{Cursor, Read};
+use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian, ReadBytesExt};
 
 pub const RTM_NEWROUTE: u16 = 24;
 pub const RTM_DELROUTE: u16 = 25;
@@ -29,18 +29,18 @@ pub const RT_TABLE_LOCAL: u32 = 255;
 #[repr(u8)]
 enum RtmType {
     UNICAST, // Gateway or direct route
-    LOCAL, // Accept locally
+    LOCAL,   // Accept locally
     BROADCAST, /* Accept locally as broadcast,
-                * send as broadcast */
-    ANYCAST, /* Accept locally as broadcast,
-              * but send as unicast */
-    MULTICAST, // Multicast route
-    BLACKHOLE, // Drop
+              * send as broadcast */
+    ANYCAST,     /* Accept locally as broadcast,
+                  * but send as unicast */
+    MULTICAST,   // Multicast route
+    BLACKHOLE,   // Drop
     UNREACHABLE, // Destination is unreachable
-    PROHIBIT, // Administratively prohibited
-    THROW, // Not in this table
-    NAT, // Translate this address
-    XRESOLVE, // Use external resolver
+    PROHIBIT,    // Administratively prohibited
+    THROW,       // Not in this table
+    NAT,         // Translate this address
+    XRESOLVE,    // Use external resolver
 }
 
 bitflags! {
@@ -93,7 +93,9 @@ impl Route {
             })
             .build();
         let mut reply = conn.send(req);
-        RoutesIterator { iter: reply.into_iter() }
+        RoutesIterator {
+            iter: reply.into_iter(),
+        }
     }
 
     fn dump_route(msg: NetlinkPacket) {

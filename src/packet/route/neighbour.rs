@@ -7,13 +7,13 @@ use std::net::IpAddr;
 use byteorder::{ByteOrder, NativeEndian};
 
 use packet::route::addr::Addr;
-use packet::route::{NeighbourDiscoveryPacket, MutableNeighbourDiscoveryPacket, RtAttrIterator,
-                    RtAttrPacket, MutableRtAttrPacket, RtAttrMtuPacket};
+use packet::route::{MutableNeighbourDiscoveryPacket, MutableRtAttrPacket,
+                    NeighbourDiscoveryPacket, RtAttrIterator, RtAttrMtuPacket, RtAttrPacket};
 use packet::route::link::Link;
-use packet::netlink::{MutableNetlinkPacket, NetlinkPacket, NetlinkErrorPacket};
+use packet::netlink::{MutableNetlinkPacket, NetlinkErrorPacket, NetlinkPacket};
 use packet::netlink::NetlinkMsgFlags;
 use packet::netlink::{NetlinkBufIterator, NetlinkReader, NetlinkRequestBuilder};
-use ::socket::{NetlinkSocket, NetlinkProtocol};
+use socket::{NetlinkProtocol, NetlinkSocket};
 use packet::netlink::NetlinkConnection;
 use pnet::packet::MutablePacket;
 use pnet::packet::Packet;
@@ -27,7 +27,7 @@ pub const RTM_GETNEIGH: u16 = 30;
 
 // See linux/neighbour.h for the source for the cosntants and structs herein
 
-#[derive(Debug,Copy,Clone)]
+#[derive(Debug, Copy, Clone)]
 #[repr(u16)]
 pub enum NeighbourAttributes {
     UNSPEC = 0,
@@ -58,7 +58,7 @@ impl From<u16> for NeighbourAttributes {
 // }
 //
 
-#[derive(Debug,Copy,Clone)]
+#[derive(Debug, Copy, Clone)]
 #[repr(u8)]
 pub enum NeighbourType {
     UNSPEC = 0,
@@ -67,8 +67,7 @@ pub enum NeighbourType {
     CACHEINFO = 3,
 }
 
-
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum LinkType {
     Vlan,
     Veth,
@@ -161,24 +160,28 @@ impl<R: Read> Iterator for NeighboursIterator<R> {
 impl ::std::fmt::Debug for Neighbour {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         let family = self.get_family();
-        write!(f,
-               "{:?}: {:?}, {:?}, {:?}, {:?}",
-               family,
-               self.get_ifindex(),
-               self.get_state(),
-               self.get_flags(),
-               self.get_type());
+        write!(
+            f,
+            "{:?}: {:?}, {:?}, {:?}, {:?}",
+            family,
+            self.get_ifindex(),
+            self.get_state(),
+            self.get_flags(),
+            self.get_type()
+        );
         self.with_rta_iter(|mut iter| {
             for rta in iter {
                 match NeighbourAttributes::from(rta.get_rta_type()) {
                     NeighbourAttributes::LLADDR => {
                         let payload = rta.payload();
-                        let mac_addr = MacAddr::new(payload[0],
-                                                    payload[1],
-                                                    payload[2],
-                                                    payload[3],
-                                                    payload[4],
-                                                    payload[5]);
+                        let mac_addr = MacAddr::new(
+                            payload[0],
+                            payload[1],
+                            payload[2],
+                            payload[3],
+                            payload[4],
+                            payload[5],
+                        );
                         write!(f, " lladdr: {:?}", mac_addr);
                     }
                     NeighbourAttributes::VLAN => {
@@ -207,12 +210,14 @@ impl ::std::fmt::Debug for Neighbour {
 }
 
 pub trait Neighbours
-    where Self: Read + Write
+where
+    Self: Read + Write,
 {
     /// iterate over neighbours
-    fn iter_neighbours(&mut self,
-                       link: Option<&Link>)
-                       -> io::Result<Box<NeighboursIterator<&mut Self>>>;
+    fn iter_neighbours(
+        &mut self,
+        link: Option<&Link>,
+    ) -> io::Result<Box<NeighboursIterator<&mut Self>>>;
     // Not implemented yet.
     // delete neighbour
     // fn delete_neighbour(&mut self, neighbour: Neighbour) -> io::Result<()>;
@@ -222,24 +227,28 @@ pub trait Neighbours
 }
 
 impl Neighbours for NetlinkConnection {
-    fn iter_neighbours(&mut self,
-                       link: Option<&Link>)
-                       -> io::Result<Box<NeighboursIterator<&mut Self>>> {
+    fn iter_neighbours(
+        &mut self,
+        link: Option<&Link>,
+    ) -> io::Result<Box<NeighboursIterator<&mut Self>>> {
         // NB: This should be a IfInfoPacket because - well see rtnetlink.c in Linux - but they pun
         // successfully.
         //
         let req = NetlinkRequestBuilder::new(RTM_GETNEIGH, NetlinkMsgFlags::NLM_F_DUMP)
-            .append(match link {
+            .append(
+                match link {
                     Some(link) => {
                         NeighbourDiscoveryPacketBuilder::new().set_ifindex(link.get_index())
                     }
                     _ => NeighbourDiscoveryPacketBuilder::new(),
-                }
-                .build())
+                }.build(),
+            )
             .build();
         try!(self.write(req.packet()));
         let reader = NetlinkReader::new(self);
-        Ok(Box::new(NeighboursIterator { iter: reader.into_iter() }))
+        Ok(Box::new(NeighboursIterator {
+            iter: reader.into_iter(),
+        }))
     }
     // fn get_neighbour_by_index(&mut self, index: u32) -> io::Result<Option<Neighbour>> {
     // let mut req = {
@@ -340,44 +349,52 @@ impl Neighbour {
     pub fn get_ll_addr(&self) -> Option<MacAddr> {
         self.with_rta(NeighbourAttributes::LLADDR, |rta| {
             let payload = rta.payload();
-            MacAddr::new(payload[0],
-                         payload[1],
-                         payload[2],
-                         payload[3],
-                         payload[4],
-                         payload[5])
+            MacAddr::new(
+                payload[0],
+                payload[1],
+                payload[2],
+                payload[3],
+                payload[4],
+                payload[5],
+            )
         })
     }
 
     pub fn get_vlan_id(&self) -> Option<u16> {
-        self.with_rta(NeighbourAttributes::VLAN,
-                      |rta| NativeEndian::read_u16(rta.payload()))
+        self.with_rta(NeighbourAttributes::VLAN, |rta| {
+            NativeEndian::read_u16(rta.payload())
+        })
     }
 
     // helper methods
     fn with_packet<T, F>(&self, mut cb: F) -> T
-        where F: FnMut(&NetlinkPacket) -> T
+    where
+        F: FnMut(&NetlinkPacket) -> T,
     {
         cb(&self.packet)
     }
 
     fn with_neighbour<T, F>(&self, mut cb: F) -> T
-        where F: FnMut(NeighbourDiscoveryPacket) -> T
+    where
+        F: FnMut(NeighbourDiscoveryPacket) -> T,
     {
         self.with_packet(|pkt| cb(NeighbourDiscoveryPacket::new(pkt.payload()).unwrap()))
     }
 
     fn with_rta_iter<T, F>(&self, mut cb: F) -> T
-        where F: FnMut(RtAttrIterator) -> T
+    where
+        F: FnMut(RtAttrIterator) -> T,
     {
         self.with_neighbour(|neigh| cb(RtAttrIterator::new(neigh.payload())))
     }
 
     fn with_rta<T, F>(&self, rta_type: NeighbourAttributes, cb: F) -> Option<T>
-        where F: Fn(RtAttrPacket) -> T
+    where
+        F: Fn(RtAttrPacket) -> T,
     {
         self.with_rta_iter(|mut rti| {
-            rti.find(|rta| rta.get_rta_type() == rta_type as u16).map(|rta| cb(rta))
+            rti.find(|rta| rta.get_rta_type() == rta_type as u16)
+                .map(|rta| cb(rta))
         })
     }
 
@@ -469,12 +486,11 @@ impl NeighbourDiscoveryPacketBuilder {
     }
 }
 
-
 mod tests {
     #[test]
     fn dump_neighbours() {
-        use ::packet::netlink::NetlinkConnection;
-        use ::packet::route::neighbour::{Neighbour, Neighbours};
+        use packet::netlink::NetlinkConnection;
+        use packet::route::neighbour::{Neighbour, Neighbours};
         let mut conn = NetlinkConnection::new();
         for neighbour in conn.iter_neighbours(None).unwrap() {
             Neighbour::dump_neighbour(neighbour.packet);
@@ -483,9 +499,9 @@ mod tests {
 
     #[test]
     fn dump_lo_neighbours() {
-        use ::packet::netlink::NetlinkConnection;
-        use ::packet::route::link::{Link, Links};
-        use ::packet::route::neighbour::{Neighbour, Neighbours};
+        use packet::netlink::NetlinkConnection;
+        use packet::route::link::{Link, Links};
+        use packet::route::neighbour::{Neighbour, Neighbours};
 
         let mut conn = NetlinkConnection::new();
         let lo0 = conn.get_link_by_name("lo").unwrap().unwrap();

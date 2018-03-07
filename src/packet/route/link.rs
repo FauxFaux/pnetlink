@@ -15,17 +15,16 @@
 //! }
 //! ```
 
-
-use packet::route::{IfInfoPacket, MutableIfInfoPacket, RtAttrIterator, RtAttrPacket,
-                    RtAttrMtuPacket};
+use packet::route::{IfInfoPacket, MutableIfInfoPacket, RtAttrIterator, RtAttrMtuPacket,
+                    RtAttrPacket};
 use packet::route::route::WithPayload;
 use packet::netlink::NetlinkPacket;
 use packet::netlink::NetlinkMsgFlags;
-use packet::netlink::{NetlinkBufIterator,NetlinkReader,NetlinkRequestBuilder};
+use packet::netlink::{NetlinkBufIterator, NetlinkReader, NetlinkRequestBuilder};
 use packet::netlink::NetlinkConnection;
 use pnet::packet::Packet;
 use pnet::util::MacAddr;
-use std::io::{Read,Write,self};
+use std::io::{self, Read, Write};
 
 /* rt message types */
 pub const RTM_NEWLINK: u16 = 16;
@@ -85,7 +84,7 @@ pub const IFLA_INFO_XSTATS: u16 = 3;
 
 /// Interface type
 /// NB: Only Generic, Ether and Loopback are currently defined
-#[derive(Debug,Copy,Clone)]
+#[derive(Debug, Copy, Clone)]
 #[repr(u16)]
 pub enum IfType {
     /* todo: more types, see if_link.h */
@@ -102,7 +101,7 @@ impl IfType {
     }
 }
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum LinkType {
     Vlan,
     Veth,
@@ -111,7 +110,7 @@ pub enum LinkType {
     Ifb,
     MacVlan,
     Can,
-    Bridge
+    Bridge,
 }
 
 /// Interface (link) flags
@@ -165,7 +164,7 @@ impl IfFlags {
 }
 
 /// Operating state
-#[derive(Debug,PartialEq,Eq)]
+#[derive(Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum OperState {
     Unknown = 0,
@@ -179,7 +178,7 @@ pub enum OperState {
 
 /// Link is a virtual of physical interface
 pub struct Link {
-    packet: NetlinkPacket<'static>
+    packet: NetlinkPacket<'static>,
 }
 
 pub struct LinksIterator<R: Read> {
@@ -197,7 +196,7 @@ impl<R: Read> Iterator for LinksIterator<R> {
                     return None;
                 }
                 return Some(Link { packet: pkt });
-            },
+            }
             None => None,
         }
     }
@@ -210,7 +209,10 @@ impl ::std::fmt::Debug for Link {
 }
 
 /// Links operation trait
-pub trait Links where Self: Read + Write {
+pub trait Links
+where
+    Self: Read + Write,
+{
     /// iterate over links
     fn iter_links(&mut self) -> io::Result<Box<LinksIterator<&mut Self>>>;
     /// returns link by its index
@@ -230,53 +232,64 @@ pub trait Links where Self: Read + Write {
 impl Links for NetlinkConnection {
     fn iter_links(&mut self) -> io::Result<Box<LinksIterator<&mut Self>>> {
         let req = NetlinkRequestBuilder::new(RTM_GETLINK, NetlinkMsgFlags::NLM_F_DUMP)
-            .append(
-                IfInfoPacketBuilder::new()
-                    .build()
-            ).build();
+            .append(IfInfoPacketBuilder::new().build())
+            .build();
         try!(self.write(req.packet()));
         let reader = NetlinkReader::new(self);
-        Ok(Box::new(LinksIterator { iter: reader.into_iter() }))
+        Ok(Box::new(LinksIterator {
+            iter: reader.into_iter(),
+        }))
     }
 
     fn get_link_by_index(&mut self, index: u32) -> io::Result<Option<Link>> {
         let req = {
             let buf = vec![0; MutableIfInfoPacket::minimum_packet_size()];
             NetlinkRequestBuilder::new(RTM_GETLINK, NetlinkMsgFlags::NLM_F_ACK)
-            .append(
-                IfInfoPacketBuilder::new()
-                    .set_index(index)
-                    .build()
-            ).build()
+                .append(IfInfoPacketBuilder::new().set_index(index).build())
+                .build()
         };
         try!(self.write(req.packet()));
         let reader = NetlinkReader::new(self);
-        let li = LinksIterator { iter: reader.into_iter() };
+        let li = LinksIterator {
+            iter: reader.into_iter(),
+        };
         Ok(li.last())
     }
 
     fn get_link_by_name(&mut self, name: &str) -> io::Result<Option<Link>> {
         let req = {
-            NetlinkRequestBuilder::new(RTM_GETLINK, NetlinkMsgFlags::NLM_F_ACK).append({
-                IfInfoPacketBuilder::new().append(
-                    RtAttrPacket::create_with_payload(IFLA_IFNAME, name)).build()
-            }).build()
+            NetlinkRequestBuilder::new(RTM_GETLINK, NetlinkMsgFlags::NLM_F_ACK)
+                .append({
+                    IfInfoPacketBuilder::new()
+                        .append(RtAttrPacket::create_with_payload(IFLA_IFNAME, name))
+                        .build()
+                })
+                .build()
         };
         try!(self.write(req.packet()));
         let reader = NetlinkReader::new(self);
-        let li = LinksIterator { iter: reader.into_iter() };
+        let li = LinksIterator {
+            iter: reader.into_iter(),
+        };
         Ok(li.last())
     }
 
     fn new_dummy_link(&mut self, name: &str) -> io::Result<()> {
         let ifi = {
-            IfInfoPacketBuilder::new().
-                append(RtAttrPacket::create_with_payload(IFLA_IFNAME, name)).
-                append(RtAttrPacket::create_with_payload(
-                    IFLA_LINKINFO, RtAttrPacket::create_with_payload(IFLA_INFO_KIND, "dummy"))).build()
+            IfInfoPacketBuilder::new()
+                .append(RtAttrPacket::create_with_payload(IFLA_IFNAME, name))
+                .append(RtAttrPacket::create_with_payload(
+                    IFLA_LINKINFO,
+                    RtAttrPacket::create_with_payload(IFLA_INFO_KIND, "dummy"),
+                ))
+                .build()
         };
-        let req = NetlinkRequestBuilder::new(RTM_NEWLINK, NetlinkMsgFlags::NLM_F_CREATE | NetlinkMsgFlags::NLM_F_EXCL | NetlinkMsgFlags::NLM_F_ACK)
-            .append(ifi).build();
+        let req = NetlinkRequestBuilder::new(
+            RTM_NEWLINK,
+            NetlinkMsgFlags::NLM_F_CREATE | NetlinkMsgFlags::NLM_F_EXCL
+                | NetlinkMsgFlags::NLM_F_ACK,
+        ).append(ifi)
+            .build();
         try!(self.write(req.packet()));
         let reader = NetlinkReader::new(self);
         reader.read_to_end()
@@ -287,12 +300,13 @@ impl Links for NetlinkConnection {
         let req = {
             let mut buf = vec![0; MutableIfInfoPacket::minimum_packet_size()];
             NetlinkRequestBuilder::new(RTM_DELLINK, NetlinkMsgFlags::NLM_F_ACK)
-            .append({
-                let mut ifinfo = MutableIfInfoPacket::new(&mut buf).unwrap();
-                ifinfo.set_family(0 /* AF_UNSPEC */);
-                ifinfo.set_index(index);
-                ifinfo
-            }).build()
+                .append({
+                    let mut ifinfo = MutableIfInfoPacket::new(&mut buf).unwrap();
+                    ifinfo.set_family(0 /* AF_UNSPEC */);
+                    ifinfo.set_index(index);
+                    ifinfo
+                })
+                .build()
         };
         try!(self.write(req.packet()));
         let reader = NetlinkReader::new(self);
@@ -310,12 +324,13 @@ impl Links for NetlinkConnection {
                     ifinfo.set_change(IfFlags::UP.bits);
                     ifinfo.set_flags(IfFlags::new(0) & !IfFlags::UP);
                     ifinfo
-                }).build()
+                })
+                .build()
         };
 
-       try!(self.write(req.packet()));
-       let reader = NetlinkReader::new(self);
-       reader.read_to_end()
+        try!(self.write(req.packet()));
+        let reader = NetlinkReader::new(self);
+        reader.read_to_end()
     }
 
     fn link_set_up(&mut self, index: u32) -> io::Result<()> {
@@ -329,14 +344,14 @@ impl Links for NetlinkConnection {
                     ifinfo.set_change(IfFlags::UP.bits);
                     ifinfo.set_flags(IfFlags::UP);
                     ifinfo
-                }).build()
+                })
+                .build()
         };
 
-       try!(self.write(req.packet()));
-       let reader = NetlinkReader::new(self);
-       reader.read_to_end()
+        try!(self.write(req.packet()));
+        let reader = NetlinkReader::new(self);
+        reader.read_to_end()
     }
-
 }
 
 impl Link {
@@ -359,7 +374,14 @@ impl Link {
     pub fn get_hw_addr(&self) -> Option<MacAddr> {
         self.with_rta(IFLA_ADDRESS, |rta| {
             let payload = rta.payload();
-            MacAddr::new(payload[0], payload[1], payload[2], payload[3], payload[4], payload[5])
+            MacAddr::new(
+                payload[0],
+                payload[1],
+                payload[2],
+                payload[3],
+                payload[4],
+                payload[5],
+            )
         })
     }
 
@@ -384,7 +406,8 @@ impl Link {
     pub fn get_state(&self) -> OperState {
         use std::mem;
         self.with_rta_iter(|mut rti| {
-            let rta = rti.find(|rta| rta.get_rta_type() == IFLA_OPERSTATE).unwrap();
+            let rta = rti.find(|rta| rta.get_rta_type() == IFLA_OPERSTATE)
+                .unwrap();
             unsafe { mem::transmute(rta.payload()[0]) }
         })
     }
@@ -393,7 +416,14 @@ impl Link {
     pub fn get_broadcast(&self) -> Option<MacAddr> {
         self.with_rta(IFLA_BROADCAST, |rta| {
             let payload = rta.payload();
-            MacAddr::new(payload[0], payload[1], payload[2], payload[3], payload[4], payload[5])
+            MacAddr::new(
+                payload[0],
+                payload[1],
+                payload[2],
+                payload[3],
+                payload[4],
+                payload[5],
+            )
         })
     }
 
@@ -407,32 +437,36 @@ impl Link {
     }
 
     // helper methods
-    fn with_packet<T,F>(&self, cb: F) -> T
-        where F: Fn(&NetlinkPacket) -> T {
+    fn with_packet<T, F>(&self, cb: F) -> T
+    where
+        F: Fn(&NetlinkPacket) -> T,
+    {
         cb(&self.packet)
     }
 
-    fn with_ifinfo<T,F>(&self, cb: F) -> T
-        where F: Fn(IfInfoPacket) -> T {
-        self.with_packet(|pkt|
-            cb(IfInfoPacket::new(pkt.payload()).unwrap())
-        )
+    fn with_ifinfo<T, F>(&self, cb: F) -> T
+    where
+        F: Fn(IfInfoPacket) -> T,
+    {
+        self.with_packet(|pkt| cb(IfInfoPacket::new(pkt.payload()).unwrap()))
     }
 
-    fn with_rta_iter<T,F>(&self, cb: F) -> T
-        where F: Fn(RtAttrIterator) -> T {
-            self.with_ifinfo(|ifi| {
-                cb(RtAttrIterator::new(ifi.payload()))
-            })
+    fn with_rta_iter<T, F>(&self, cb: F) -> T
+    where
+        F: Fn(RtAttrIterator) -> T,
+    {
+        self.with_ifinfo(|ifi| cb(RtAttrIterator::new(ifi.payload())))
     }
 
-    fn with_rta<T,F>(&self, rta_type: u16, cb: F) -> Option<T>
-        where F: Fn(RtAttrPacket) -> T {
+    fn with_rta<T, F>(&self, rta_type: u16, cb: F) -> Option<T>
+    where
+        F: Fn(RtAttrPacket) -> T,
+    {
         self.with_rta_iter(|mut rti| {
-            rti.find(|rta| rta.get_rta_type() == rta_type).map(|rta| cb(rta))
+            rti.find(|rta| rta.get_rta_type() == rta_type)
+                .map(|rta| cb(rta))
         })
     }
-
 
     // static methods
     fn get_links_iter<R: Read>(r: NetlinkBufIterator<R>) -> LinksIterator<R> {
@@ -455,27 +489,34 @@ impl Link {
             for rta in iter {
                 match rta.get_rta_type() {
                     IFLA_IFNAME => {
-                        println!(" ├ ifname: {:?}", CStr::from_bytes_with_nul(rta.payload()));
-                    },
+                        println!(
+                            " ├ ifname: {:?}",
+                            CStr::from_bytes_with_nul(rta.payload())
+                        );
+                    }
                     IFLA_ADDRESS => {
                         println!(" ├ hw addr: {:?}", rta.payload());
-                    },
+                    }
                     IFLA_LINKINFO => {
                         println!(" ├ LINKINFO {:?}", rta);
-                    },
+                    }
                     IFLA_MTU => {
                         let rta = RtAttrMtuPacket::new(rta.packet()).unwrap();
                         println!(" |- MTU {:?}", rta);
-                    },
+                    }
                     IFLA_QDISC => {
-                        println!(" ├ QDISC {:?} {:?}", rta, CStr::from_bytes_with_nul(rta.payload()));
-                    },
+                        println!(
+                            " ├ QDISC {:?} {:?}",
+                            rta,
+                            CStr::from_bytes_with_nul(rta.payload())
+                        );
+                    }
                     IFLA_OPERSTATE => {
                         println!(" ├ OPERSTATE {:?} {:?}", rta, rta.payload());
-                    },
+                    }
                     _ => {
                         println!(" ├ {:?}", rta);
-                    },
+                    }
                 }
             }
         }
@@ -541,12 +582,11 @@ impl IfInfoPacketBuilder {
     }
 }
 
-
 mod tests {
     #[test]
     fn dump_links() {
-        use ::packet::netlink::NetlinkConnection;
-        use ::packet::route::link::{Link,Links};
+        use packet::netlink::NetlinkConnection;
+        use packet::route::link::{Link, Links};
         let mut conn = NetlinkConnection::new();
         for link in conn.iter_links().unwrap() {
             Link::dump_link(link.packet);
@@ -555,8 +595,8 @@ mod tests {
 
     #[test]
     fn find_lo() {
-        use ::packet::netlink::NetlinkConnection;
-        use ::packet::route::link::Links;
+        use packet::netlink::NetlinkConnection;
+        use packet::route::link::Links;
 
         let mut conn = NetlinkConnection::new();
         let lo0 = conn.get_link_by_name("lo").unwrap();
@@ -572,24 +612,30 @@ mod tests {
     #[test]
     // root permissions required
     fn create_and_delete_link() {
-        use ::packet::netlink::NetlinkConnection;
-        use ::packet::route::link::Links;
+        use packet::netlink::NetlinkConnection;
+        use packet::route::link::Links;
 
         let mut conn = NetlinkConnection::new();
         conn.new_dummy_link("test1488").unwrap();
         let link = conn.get_link_by_name("test1488").unwrap().unwrap();
         assert!(link.get_name() == Some("test1488".to_owned()));
-        conn.iter_links().unwrap().find(|link| link.get_name() == Some("test1488".to_owned())).is_some();
+        conn.iter_links()
+            .unwrap()
+            .find(|link| link.get_name() == Some("test1488".to_owned()))
+            .is_some();
         conn.delete_link(link);
-        conn.iter_links().unwrap().find(|link| link.get_name() == Some("test1488".to_owned())).is_none();
+        conn.iter_links()
+            .unwrap()
+            .find(|link| link.get_name() == Some("test1488".to_owned()))
+            .is_none();
     }
 
     #[test]
     // CAP_NET_ADMIN needed
     fn up_and_down_link() {
-        use ::packet::netlink::NetlinkConnection;
-        use ::packet::route::link::Links;
-        use ::packet::route::link::IfFlags;
+        use packet::netlink::NetlinkConnection;
+        use packet::route::link::Links;
+        use packet::route::link::IfFlags;
 
         let linkname = "test1489";
 
@@ -601,12 +647,12 @@ mod tests {
 
         let link = conn.get_link_by_name(linkname).unwrap().unwrap();
 
-        assert!(link.get_flags() & IfFlags::UP == IfFlags::UP ); // Is up
+        assert!(link.get_flags() & IfFlags::UP == IfFlags::UP); // Is up
 
         conn.link_set_down(link.get_index()).unwrap();
 
         let link = conn.get_link_by_name(linkname).unwrap().unwrap();
-        assert!((link.get_flags() & IfFlags::UP).is_empty() ); // Is down
+        assert!((link.get_flags() & IfFlags::UP).is_empty()); // Is down
 
         conn.delete_link(link);
     }

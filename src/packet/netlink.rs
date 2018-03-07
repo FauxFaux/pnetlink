@@ -1,10 +1,10 @@
 //! Netlink packet handling
-use ::socket::{NetlinkSocket,NetlinkProtocol};
+use socket::{NetlinkProtocol, NetlinkSocket};
 use libc;
 use std::io;
-use std::io::{Read,BufRead,BufReader,Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::marker::PhantomData;
-use pnet::packet::{Packet,PacketSize,FromPacket};
+use pnet::packet::{FromPacket, Packet, PacketSize};
 
 include!(concat!(env!("OUT_DIR"), "/netlink.rs"));
 
@@ -46,7 +46,6 @@ pub const NLMSG_NOOP: u16 = 1;
 pub const NLMSG_ERROR: u16 = 2;
 pub const NLMSG_DONE: u16 = 3;
 pub const NLMSG_OVERRUN: u16 = 4;
-
 
 impl<'a> NetlinkIterable<'a> {
     pub fn new(buf: &'a [u8]) -> Self {
@@ -163,19 +162,19 @@ impl<R: Read> NetlinkReader<R> {
                         Ok(0) => {
                             self.state = NetlinkReaderState::Done;
                             return Ok(None);
-                        },
-                        Ok(len) =>{
+                        }
+                        Ok(len) => {
                             self.buf.extend_from_slice(&buf[0..len]);
-                        },
+                        }
                         Err(e) => {
                             self.state = NetlinkReaderState::Error;
                             return Err(e);
                         }
                     }
-                },
+                }
                 NetlinkReaderState::Done => return Ok(None),
                 NetlinkReaderState::Error => return Ok(None),
-                NetlinkReaderState::Parsing => { },
+                NetlinkReaderState::Parsing => {}
             }
             loop {
                 if let Some(pkt) = NetlinkPacket::new(&self.buf[self.read_at..]) {
@@ -186,21 +185,21 @@ impl<R: Read> NetlinkReader<R> {
                     match pkt.get_kind() {
                         NLMSG_ERROR => {
                             self.state = NetlinkReaderState::Error;
-                        },
+                        }
                         NLMSG_OVERRUN => {
                             panic!("overrun!");
-                        },
+                        }
                         NLMSG_DONE => {
                             self.state = NetlinkReaderState::Done;
-                        },
-                        NLMSG_NOOP => {
-                            println!("noop")
-                        },
+                        }
+                        NLMSG_NOOP => println!("noop"),
                         _ => {
                             self.state = NetlinkReaderState::Parsing;
-                        },
+                        }
                     }
-                    let slot = NetlinkPacket::owned(self.buf[self.read_at..self.read_at + pkt.get_length() as usize].to_owned()).unwrap();
+                    let slot = NetlinkPacket::owned(
+                        self.buf[self.read_at..self.read_at + pkt.get_length() as usize].to_owned(),
+                    ).unwrap();
                     self.read_at += len;
                     return Ok(Some(slot));
                 } else {
@@ -245,7 +244,10 @@ impl NetlinkConnection {
         }
     }
 
-    pub fn send<'a,'b>(&'a mut self, msg: NetlinkPacket<'b>) -> NetlinkReader<&'a mut NetlinkConnection> {
+    pub fn send<'a, 'b>(
+        &'a mut self,
+        msg: NetlinkPacket<'b>,
+    ) -> NetlinkReader<&'a mut NetlinkConnection> {
         self.sock.send(msg.packet()).unwrap();
         NetlinkReader::new(self)
     }
@@ -285,12 +287,10 @@ impl NetlinkRequestBuilder {
             pkt.set_kind(kind);
             pkt.set_flags(flags | NetlinkMsgFlags::NLM_F_REQUEST);
         }
-        NetlinkRequestBuilder {
-            data: data,
-        }
+        NetlinkRequestBuilder { data: data }
     }
 
-    /// Appends `data` to Netlink header. Alignment is handled 
+    /// Appends `data` to Netlink header. Alignment is handled
     /// automatically.
     pub fn append<P: PacketSize + Packet>(mut self, data: P) -> Self {
         let data = data.packet();

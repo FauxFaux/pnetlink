@@ -1,6 +1,6 @@
 //! RTNETLINK aka Netlink Route Family is used for network device configuration.
 //!
-//! Different layer operations are implemented as traits 
+//! Different layer operations are implemented as traits
 //! on NetlinkConnection
 pub mod addr;
 pub mod link;
@@ -13,7 +13,7 @@ include!(concat!(env!("OUT_DIR"), "/route/route.rs"));
 const RTA_ALIGNTO: usize = 4;
 
 fn align(len: usize) -> usize {
-    ((len)+RTA_ALIGNTO-1) & !(RTA_ALIGNTO-1)
+    ((len) + RTA_ALIGNTO - 1) & !(RTA_ALIGNTO - 1)
 }
 
 /// RTNETLINK attribute iterator
@@ -23,9 +23,7 @@ pub struct RtAttrIterator<'a> {
 
 impl<'a> RtAttrIterator<'a> {
     pub fn new(buf: &'a [u8]) -> Self {
-        RtAttrIterator {
-            buf: buf,
-        }
+        RtAttrIterator { buf: buf }
     }
 }
 
@@ -44,5 +42,3 @@ impl<'a> Iterator for RtAttrIterator<'a> {
         None
     }
 }
-
-
