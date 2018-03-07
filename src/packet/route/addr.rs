@@ -165,7 +165,7 @@ impl Addresses for NetlinkConnection {
                 ifinfo
             })
             .build();
-        try!(self.write(req.packet()));
+        self.write(req.packet())?;
         let reader = NetlinkReader::new(self);
         let iter = AddrsIterator {
             iter: reader.into_iter(),
@@ -188,7 +188,7 @@ impl Addresses for NetlinkConnection {
                 ifinfo
             })
             .build();
-        try!(self.write(req.packet()));
+        self.write(req.packet())?;
         let reader = NetlinkReader::new(self);
         let iter = AddrsIterator {
             iter: reader.into_iter(),

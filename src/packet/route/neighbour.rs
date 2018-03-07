@@ -244,7 +244,7 @@ impl Neighbours for NetlinkConnection {
                 }.build(),
             )
             .build();
-        try!(self.write(req.packet()));
+        self.write(req.packet())?;
         let reader = NetlinkReader::new(self);
         Ok(Box::new(NeighboursIterator {
             iter: reader.into_iter(),

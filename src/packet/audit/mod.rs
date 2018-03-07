@@ -31,7 +31,7 @@ impl Audit for NetlinkConnection {
             status
         })
             .build();
-        try!(self.write(req.packet()));
+        self.write(req.packet())?;
         let reader = NetlinkReader::new(self);
         reader.read_to_end()
     }

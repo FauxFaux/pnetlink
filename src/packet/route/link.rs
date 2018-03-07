@@ -234,7 +234,7 @@ impl Links for NetlinkConnection {
         let req = NetlinkRequestBuilder::new(RTM_GETLINK, NetlinkMsgFlags::NLM_F_DUMP)
             .append(IfInfoPacketBuilder::new().build())
             .build();
-        try!(self.write(req.packet()));
+        self.write(req.packet())?;
         let reader = NetlinkReader::new(self);
         Ok(Box::new(LinksIterator {
             iter: reader.into_iter(),
@@ -248,7 +248,7 @@ impl Links for NetlinkConnection {
                 .append(IfInfoPacketBuilder::new().set_index(index).build())
                 .build()
         };
-        try!(self.write(req.packet()));
+        self.write(req.packet())?;
         let reader = NetlinkReader::new(self);
         let li = LinksIterator {
             iter: reader.into_iter(),
@@ -266,7 +266,7 @@ impl Links for NetlinkConnection {
                 })
                 .build()
         };
-        try!(self.write(req.packet()));
+        self.write(req.packet())?;
         let reader = NetlinkReader::new(self);
         let li = LinksIterator {
             iter: reader.into_iter(),
@@ -290,7 +290,7 @@ impl Links for NetlinkConnection {
                 | NetlinkMsgFlags::NLM_F_ACK,
         ).append(ifi)
             .build();
-        try!(self.write(req.packet()));
+        self.write(req.packet())?;
         let reader = NetlinkReader::new(self);
         reader.read_to_end()
     }
@@ -308,7 +308,7 @@ impl Links for NetlinkConnection {
                 })
                 .build()
         };
-        try!(self.write(req.packet()));
+        self.write(req.packet())?;
         let reader = NetlinkReader::new(self);
         reader.read_to_end()
     }
@@ -328,7 +328,7 @@ impl Links for NetlinkConnection {
                 .build()
         };
 
-        try!(self.write(req.packet()));
+        self.write(req.packet())?;
         let reader = NetlinkReader::new(self);
         reader.read_to_end()
     }
@@ -348,7 +348,7 @@ impl Links for NetlinkConnection {
                 .build()
         };
 
-        try!(self.write(req.packet()));
+        self.write(req.packet())?;
         let reader = NetlinkReader::new(self);
         reader.read_to_end()
     }
